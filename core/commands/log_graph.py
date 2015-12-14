@@ -1,5 +1,6 @@
 import sublime
 from sublime_plugin import WindowCommand, TextCommand
+from textwrap import dedent
 
 from ..git_command import GitCommand
 from ...common import util
@@ -48,9 +49,21 @@ class GsLogGraphInitializeCommand(TextCommand, GitCommand):
         if all_branches:
             args.append("--all")
 
-        branch_graph = self.git(*args)
+        header_text = """\
+        SHOWING: {all_branches}
+        [,], [.]   navigate commits                  [m] toggle commit info
+        [enter] view commit                          [cmd-enter] checkout commit
+        [b] alternate current/all branches
+        """
+        branch_graph = dedent(header_text) + self.git(*args)
         self.view.run_command("gs_replace_view_text", {"text": branch_graph, "nuke_cursors": True})
+        
+        #selections = self.view.sel()
+        #selections.clear()
+        #pt = sublime.Region(200,200)
+        #selections.add(pt)
         self.view.run_command("gs_log_graph_more_info")
+        self.view.window().run_command("gs_log_graph_next_commit", {"forward": True})
 
 
 class GsLogGraphActionCommand(TextCommand, GitCommand):
@@ -72,6 +85,8 @@ class GsLogGraphActionCommand(TextCommand, GitCommand):
         if not lines:
             return
         line = lines[0]
+        if line[0] not in ['*', '|']:
+            return
 
         commit_hash = line.strip(" /_\|*")[:7]
         if self.action == "checkout":
@@ -102,6 +117,9 @@ class GsLogGraphMoreInfoCommand(TextCommand, GitCommand):
             return
         line = lines[0]
 
+        if line[0] not in ['*', '|']:
+            return
+
         commit_hash = line.strip(" /_\|*")[:7]
         if len(commit_hash) <= 3:
             return
@@ -131,9 +149,10 @@ class GsLogGraphNextCommitCommand(TextCommand, GitCommand):
         if not lines:
             return
         line = lines[0]
-
+        if line[0] not in ['*', '|'] and not forward:
+            return
         commit_hash = line.strip(" /_\|*")[:7]
-        if len(commit_hash) > 3:
+        if line[0] in ['*', '|'] and len(commit_hash) > 3:
             self.view.window().run_command("gs_log_graph_more_info")
             self.view.window().run_command("show_at_center")
         else:
